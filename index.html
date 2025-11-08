@@ -324,7 +324,32 @@
     togglePlay(true); // start spinning/animating on load
 
     // ---------- Rendering to Video ----------
+    async function acquireStageStream(fps){
+      if(stage.captureStream){
+        return { stream: stage.captureStream(fps), cleanup: ()=>{} };
+      }
+      if(stage.mozCaptureStream){
+        return { stream: stage.mozCaptureStream(fps), cleanup: ()=>{} };
+      }
+      if(navigator.mediaDevices?.getDisplayMedia){
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({
+          audio: false,
+          video: {
+            frameRate: fps,
+            width: Math.round(stage.clientWidth * window.devicePixelRatio),
+            height: Math.round(stage.clientHeight * window.devicePixelRatio),
+            displaySurface: 'browser',
+            cursor: 'never'
+          }
+        });
+        const cleanup = () => displayStream.getTracks().forEach(track => track.stop());
+        return { stream: displayStream, cleanup };
+      }
+      throw new Error('Stage capture is not supported in this browser');
+    }
+
     async function renderVideo(fmt){
+      let cleanupStream = () => {};
       try{
         body.classList.add('exporting');
         await new Promise(r=>setTimeout(r,150)); // let layout settle
@@ -336,7 +361,8 @@
         togglePlay(true);
 
         const fps = 60; // target
-        const stream = stage.captureStream(fps);
+        const { stream, cleanup } = await acquireStageStream(fps);
+        cleanupStream = cleanup;
         const chunks = [];
         const mimeWebm = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
         const rec = new MediaRecorder(stream, { mimeType: mimeWebm, videoBitsPerSecond: 8_000_000 });
@@ -364,6 +390,7 @@
         alert('Render failed: ' + err.message);
       } finally {
         body.classList.remove('exporting');
+        cleanupStream();
       }
     }
 
