@@ -57,7 +57,13 @@ padding:24px;width:min(100%,1100px);transition:all .4s;}
 .cover{position:relative;aspect-ratio:1/1;border-radius:24px;overflow:hidden;
 background:linear-gradient(135deg,#0d121f,#141b2d);border:1px solid var(--stroke);
 display:grid;place-items:center;}
-.cover.has-image img{width:100%;height:100%;object-fit:cover;}
+.cover.has-image img{
+  width:100%;
+  height:100%;
+  object-fit:contain; /* ✅ Prevents stretching */
+  object-position:center;
+  background:rgba(0,0,0,.2);
+}
 .meta h1{margin:0 0 6px;font-size:28px;}
 .meta h2{margin:0 0 18px;font-size:16px;font-weight:500;color:var(--muted);}
 .badge{font-size:11px;padding:8px 10px;border-radius:999px;border:1px solid var(--stroke);
@@ -72,9 +78,8 @@ border:1px solid var(--stroke);border-radius:50%;width:48px;height:48px;display:
 cursor:pointer;transition:all .2s ease;}
 .controls button:hover{transform:scale(1.1);}
 .controls svg{width:22px;height:22px;fill:var(--text);}
-.toolbar{position:absolute;top:18px;left:18px;display:flex;gap:10px;z-index:5;}
-.chip{font-size:12px;padding:10px 12px;border-radius:999px;border:1px solid var(--stroke);
-background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.1));cursor:pointer;}
+.toolbar{position:absolute;top:18px;left:18px;display:none;gap:10px;z-index:5;} /* ✅ hidden */
+.chip{display:none;} /* ✅ hide aspect ratio chips */
 .credits{position:absolute;bottom:18px;left:18px;font-size:11px;color:var(--muted);opacity:.85;}
 </style>
 </head>
@@ -84,9 +89,10 @@ background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.1));cu
   <label>Song Title <input id="inTitle" type="text" value="Song Title – Lounge Edit"/></label>
   <label>Artist Name <input id="inArtist" type="text" value="Artist Name • House of Tyche"/></label>
   <label>Cover Image <input id="inCover" type="file" accept="image/*"/></label>
-  <button class="btn" onclick="setAspect('frame-169')">16:9</button>
-  <button class="btn" onclick="setAspect('frame-916')">9:16</button>
-  <button class="btn" onclick="setAspect('frame-11')">1:1</button>
+  <!-- Aspect ratio buttons hidden -->
+  <button class="btn" style="display:none;" onclick="setAspect('frame-169')">16:9</button>
+  <button class="btn" style="display:none;" onclick="setAspect('frame-916')">9:16</button>
+  <button class="btn" style="display:none;" onclick="setAspect('frame-11')">1:1</button>
   <button class="btn" onclick="toggleTheme()">Light/Dark</button>
   <div class="info"><button class="btn primary" onclick="downloadPNG()">Download PNG</button></div>
 </div>
@@ -126,12 +132,7 @@ background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.1));cu
               <svg viewBox="0 0 24 24"><path d="M18 4v16l-8.5-8L18 4zm-11 0v16h3V4H7z"/></svg>
             </button>
 
-            <!-- ✅ Fixed Shuffle icon -->
-            <button onclick="toggleShuffle()">
-              <svg viewBox="0 0 24 24">
-                <path d="M17 3h4v4h-2V5h-2V3zM7.59 5.59 16 14h4v-2h-3.17L8.41 3.59 7 5l.59.59zM4 6H2v2h2c1.1 0 2 .9 2 2v1l1.41 1.41L4 8V6zm13 11v-2h-2l-4.59-4.59L9 11l4 4H7v2h10zm2 0h2v4h-4v-2h2v-2z"/>
-              </svg>
-            </button>
+            <!-- ❌ Shuffle button removed -->
 
             <button onclick="toggleRepeat()">
               <svg viewBox="0 0 24 24"><path d="M17 17H7v-3l-4 4 4 4v-3h10c1.1 0 2-.9 2-2v-4h-2v4zM7 7h10v3l4-4-4-4v3H7c-1.1 0-2 .9-2 2v4h2V7z"/></svg>
@@ -141,12 +142,8 @@ background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,.1));cu
       </div>
     </div>
   </div>
-  <div class="toolbar">
-    <div class="chip" onclick="setAspect('frame-169')">16:9</div>
-    <div class="chip" onclick="setAspect('frame-916')">9:16</div>
-    <div class="chip" onclick="setAspect('frame-11')">1:1</div>
-  </div>
-  <div class="credits">Like,Share & Subscribe • House of Tyche</div>
+  <div class="toolbar"><!-- Hidden --></div>
+  <div class="credits">iOS26 Glass Music Player – PNG Exporter (Enhanced)</div>
 </div>
 
 <script>
@@ -157,7 +154,7 @@ artistEl=document.querySelector('#artist'),
 ppIcon=document.querySelector('#ppIcon'),
 timeline=document.querySelector('#timeline');
 
-let isPlaying=false,shuffle=false,repeat=false,theme='system';
+let isPlaying=false,repeat=false,theme='system';
 
 function togglePlayPause(){
   isPlaying=!isPlaying;
@@ -166,9 +163,7 @@ function togglePlayPause(){
 }
 function prevTrack(){alert("Previous Track (visual only)");}
 function nextTrack(){alert("Next Track (visual only)");}
-function toggleShuffle(){shuffle=!shuffle;alert("Shuffle "+(shuffle?"On":"Off"));}
 function toggleRepeat(){repeat=!repeat;alert("Repeat "+(repeat?"On":"Off"));}
-function setAspect(cls){stage.className='frame '+cls;if(cls==='frame-916')stage.classList.add('portrait');}
 function toggleTheme(){document.body.classList.toggle('light');}
 document.querySelector('#inTitle').oninput=e=>titleEl.textContent=e.target.value;
 document.querySelector('#inArtist').oninput=e=>artistEl.textContent=e.target.value;
@@ -193,7 +188,10 @@ function setTheme(name){
   }
 }
 async function downloadPNG(){
-  const canvas=await html2canvas(stage,{backgroundColor:null,scale:2,useCORS:true});
+  const canvas=await html2canvas(stage,{
+    backgroundColor:null,scale:2,useCORS:true,
+    onclone:(doc)=>{const img=doc.querySelector('.cover.has-image img');if(img)img.style.objectFit='contain';}
+  });
   canvas.toBlob(blob=>{
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
