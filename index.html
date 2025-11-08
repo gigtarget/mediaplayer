@@ -4,7 +4,7 @@
   • Aspect presets: 16:9, 9:16, 1:1 (top‑left)
   • Light/Dark toggle + Accent swatches
   • Render button exports a clean video of the player “playing” for the full duration
-    - WebM (fast, built‑in) via MediaRecorder on element captureStream()
+    - WebM (fast, built‑in) rendered via headless canvas (no screen recording prompts)
     - MP4 (beta, slower) via ffmpeg.wasm transcoding the recorded WebM
   • Toolbars/controls auto‑hide during render. Only the player is captured.
 -->
@@ -324,32 +324,7 @@
     togglePlay(true); // start spinning/animating on load
 
     // ---------- Rendering to Video ----------
-    async function acquireStageStream(fps){
-      if(stage.captureStream){
-        return { stream: stage.captureStream(fps), cleanup: ()=>{} };
-      }
-      if(stage.mozCaptureStream){
-        return { stream: stage.mozCaptureStream(fps), cleanup: ()=>{} };
-      }
-      if(navigator.mediaDevices?.getDisplayMedia){
-        const displayStream = await navigator.mediaDevices.getDisplayMedia({
-          audio: false,
-          video: {
-            frameRate: fps,
-            width: Math.round(stage.clientWidth * window.devicePixelRatio),
-            height: Math.round(stage.clientHeight * window.devicePixelRatio),
-            displaySurface: 'browser',
-            cursor: 'never'
-          }
-        });
-        const cleanup = () => displayStream.getTracks().forEach(track => track.stop());
-        return { stream: displayStream, cleanup };
-      }
-      throw new Error('Stage capture is not supported in this browser');
-    }
-
     async function renderVideo(fmt){
-      let cleanupStream = () => {};
       try{
         body.classList.add('exporting');
         await new Promise(r=>setTimeout(r,150)); // let layout settle
@@ -362,15 +337,7 @@
 
         const fps = 60; // target
         const mimeWebm = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-        let webmBlob = null;
-
-        if(stage.captureStream || stage.mozCaptureStream){
-          const { stream, cleanup } = await acquireStageStream(fps);
-          cleanupStream = cleanup;
-          webmBlob = await recordStreamToBlob(stream, mimeWebm, durationMs());
-        } else {
-          webmBlob = await renderViaCanvasCapture(fps, mimeWebm, durationMs());
-        }
+        const webmBlob = await renderViaCanvasCapture(fps, mimeWebm, durationMs());
 
         if(fmt === 'webm'){
           saveBlob(webmBlob, safeFileName(inTitle.value || 'song') + '.webm');
@@ -385,7 +352,6 @@
       } finally {
         togglePlay(false);
         body.classList.remove('exporting');
-        cleanupStream();
       }
     }
 
