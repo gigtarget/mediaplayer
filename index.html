@@ -361,22 +361,16 @@
         togglePlay(true);
 
         const fps = 60; // target
-        const { stream, cleanup } = await acquireStageStream(fps);
-        cleanupStream = cleanup;
-        const chunks = [];
         const mimeWebm = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
-        const rec = new MediaRecorder(stream, { mimeType: mimeWebm, videoBitsPerSecond: 8_000_000 });
-        rec.ondataavailable = e => e.data && chunks.push(e.data);
-        const done = new Promise(res=>rec.onstop = res);
-        rec.start(100); // collect in 100ms chunks
+        let webmBlob = null;
 
-        // Stop when duration elapses
-        await new Promise(r=>setTimeout(r, durationMs()));
-        rec.stop();
-        await done;
-        togglePlay(false);
-
-        const webmBlob = new Blob(chunks, { type: mimeWebm });
+        if(stage.captureStream || stage.mozCaptureStream){
+          const { stream, cleanup } = await acquireStageStream(fps);
+          cleanupStream = cleanup;
+          webmBlob = await recordStreamToBlob(stream, mimeWebm, durationMs());
+        } else {
+          webmBlob = await renderViaCanvasCapture(fps, mimeWebm, durationMs());
+        }
 
         if(fmt === 'webm'){
           saveBlob(webmBlob, safeFileName(inTitle.value || 'song') + '.webm');
@@ -389,8 +383,104 @@
         console.error(err);
         alert('Render failed: ' + err.message);
       } finally {
+        togglePlay(false);
         body.classList.remove('exporting');
         cleanupStream();
+      }
+    }
+
+    async function recordStreamToBlob(stream, mime, runForMs){
+      const chunks = [];
+      const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      rec.ondataavailable = e => e.data && chunks.push(e.data);
+      const done = new Promise(res=>rec.onstop = res);
+      rec.start(100);
+      await new Promise(r=>setTimeout(r, runForMs));
+      rec.stop();
+      await done;
+      return new Blob(chunks, { type: mime });
+    }
+
+    async function renderViaCanvasCapture(fps, mimeType, runForMs){
+      const rect = stage.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(rect.width * scale);
+      canvas.height = Math.round(rect.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+
+      const stream = canvas.captureStream(fps);
+      const recordingPromise = recordStreamToBlob(stream, mimeType, runForMs + 1000/fps);
+      const styleCache = buildStyleCache(stage);
+      const frameDelay = 1000 / fps;
+      const start = performance.now();
+
+      while(performance.now() - start < runForMs){
+        await paintStageFrame(ctx, rect.width, rect.height, styleCache);
+        await new Promise(r=>setTimeout(r, frameDelay));
+      }
+
+      await paintStageFrame(ctx, rect.width, rect.height, styleCache);
+      const blob = await recordingPromise;
+      stream.getTracks().forEach(track=>track.stop());
+      canvas.remove();
+      return blob;
+    }
+
+    function buildStyleCache(root){
+      const cache = new Map();
+      (function walk(node){
+        if(node.nodeType === Node.ELEMENT_NODE){
+          const comp = getComputedStyle(node);
+          let cssText = '';
+          for(const prop of comp){
+            if(prop.startsWith('animation') || prop.startsWith('transition') || prop === 'transform') continue;
+            const value = comp.getPropertyValue(prop);
+            if(value) cssText += `${prop}:${value};`;
+          }
+          cssText += 'animation:none !important;transition:none !important;';
+          cache.set(node, cssText);
+        }
+        Array.from(node.childNodes).forEach(walk);
+      })(root);
+      return cache;
+    }
+
+    async function paintStageFrame(ctx, width, height, cache){
+      const clone = stage.cloneNode(true);
+      clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      syncComputedStyles(stage, clone, cache);
+      const serialized = new XMLSerializer().serializeToString(clone);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${serialized}</foreignObject></svg>`;
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      ctx.clearRect(0, 0, width, height);
+      if('createImageBitmap' in window){
+        const bmp = await createImageBitmap(blob);
+        ctx.drawImage(bmp, 0, 0, width, height);
+        bmp.close && bmp.close();
+      } else {
+        const url = URL.createObjectURL(blob);
+        await new Promise((resolve, reject)=>{
+          const img = new Image();
+          img.onload = () => { ctx.drawImage(img, 0, 0, width, height); URL.revokeObjectURL(url); resolve(); };
+          img.onerror = reject;
+          img.src = url;
+        });
+      }
+    }
+
+    function syncComputedStyles(src, dest, cache){
+      if(src.nodeType === Node.ELEMENT_NODE && dest.nodeType === Node.ELEMENT_NODE){
+        const base = cache.get(src) || '';
+        const comp = getComputedStyle(src);
+        const transform = comp.transform && comp.transform !== 'none' ? `transform:${comp.transform};` : '';
+        dest.setAttribute('style', base + transform);
+      }
+      const srcChildren = Array.from(src.childNodes);
+      const destChildren = Array.from(dest.childNodes);
+      for(let i=0;i<srcChildren.length;i++){
+        syncComputedStyles(srcChildren[i], destChildren[i], cache);
       }
     }
 
