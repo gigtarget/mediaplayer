@@ -59,9 +59,22 @@ display:grid;place-items:center;}
 .meta h2{margin:0 0 18px;font-size:16px;font-weight:500;color:var(--muted);text-align:center;}
 #stage.tall .meta h1{font-size:24px;}
 #stage.tall .meta h2{font-size:14px;}
-.badge{font-size:18px;padding:8px 10px;border-radius:999px;border:1px solid var(--stroke);
-background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.06));
-text-transform:uppercase;display:inline-block;margin-right:8px;}
+
+/* FIXED BADGE */
+.badge{
+  font-size:18px;
+  padding:8px 12px;
+  border-radius:999px;
+  border:1px solid var(--stroke);
+  background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.06));
+  text-transform:uppercase;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-right:8px;
+  line-height:1;
+}
+
 .timeline{width:100%;height:6px;background:rgba(255,255,255,.1);
 border-radius:999px;overflow:hidden;margin-top:20px;}
 .timeline-fill{width:60%;height:100%;background:var(--accent);transition:width 1s linear;}
@@ -72,7 +85,7 @@ cursor:pointer;transition:all .2s ease;}
 .controls button:hover{transform:scale(1.1);}
 .controls svg{width:22px;height:22px;fill:var(--text);}
 .credits{position:absolute;bottom:18px;left:18px;font-size:11px;color:var(--muted);opacity:.85;}
-/* CROP MODAL */
+
 #cropModal{
   position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;
   justify-content:center;align-items:center;z-index:100;
@@ -104,8 +117,13 @@ cursor:pointer;transition:all .2s ease;}
         <div class="meta">
           <h1 id="title" contenteditable>SAHIBA | Afro Chill Hindi Cover</h1>
           <h2 id="artist" contenteditable>House of Tyche • Woven by Jatin Dhiman</h2>
-          <div class="badge">HI-RES</div><div class="badge">STEREO</div><div class="badge">24-BIT</div>
+
+          <div class="badge">HI-RES</div>
+          <div class="badge">STEREO</div>
+          <div class="badge">24-BIT</div>
+
           <div class="timeline"><div class="timeline-fill" id="timeline"></div></div>
+
           <div class="controls">
             <button onclick="prevTrack()"><svg viewBox="0 0 24 24"><path d="M6 4v16l8.5-8L6 4zm9 0v16h3V4h-3z"/></svg></button>
             <button id="ppBtn" onclick="togglePlayPause()">
@@ -118,10 +136,10 @@ cursor:pointer;transition:all .2s ease;}
       </div>
     </div>
   </div>
+
   <div class="credits">Like, Share & Subscribe • House of Tyche • Woven by Jatin Dhiman</div>
 </div>
 
-<!-- Crop Modal -->
 <div id="cropModal">
   <div id="cropBox">
     <img id="cropImage" src="">
@@ -152,6 +170,7 @@ function togglePlayPause(){
 function prevTrack(){alert("Previous Track (visual only)");}
 function nextTrack(){alert("Next Track (visual only)");}
 function toggleRepeat(){repeat=!repeat;alert("Repeat "+(repeat?"On":"Off"));}
+
 function toggleTheme(){document.body.classList.toggle('light');}
 
 function toggleAspect(){
@@ -168,7 +187,6 @@ function toggleAspect(){
 document.querySelector('#inTitle').oninput=e=>titleEl.textContent=e.target.value;
 document.querySelector('#inArtist').oninput=e=>artistEl.textContent=e.target.value;
 
-// Manual cropper
 inCover.addEventListener('change',e=>{
   const f=e.target.files?.[0];
   if(!f)return;
@@ -216,5 +234,6 @@ async function downloadPNG(){
   });
 }
 </script>
+
 </body>
 </html>
